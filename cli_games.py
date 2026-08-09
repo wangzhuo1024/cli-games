@@ -154,28 +154,28 @@ def get_terminal_size() -> tuple:
 
 class KeyHandler:
     """键盘输入处理器"""
-    
+
     def __init__(self):
         self.running = False
         self.key_queue: List[str] = []
         self.lock = threading.Lock()
         self.thread: Optional[threading.Thread] = None
-    
+
     def start(self):
         """开始监听键盘输入"""
         self.running = True
         self.thread = threading.Thread(target=self._read_keys, daemon=True)
         self.thread.start()
-    
+
     def stop(self):
         """停止监听"""
         self.running = False
-    
+
     def _read_keys(self):
         """读取键盘输入（Unix）"""
         import tty
         import termios
-        
+
         if os.name != 'nt':
             fd = sys.stdin.fileno()
             old_settings = termios.tcgetattr(fd)
@@ -208,21 +208,21 @@ class KeyHandler:
                             key = 'SPACE'
                         else:
                             key = char.upper() if char.isalpha() else char
-                        
+
                         with self.lock:
                             self.key_queue.append(key)
                     except Exception:
                         break
             finally:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-    
+
     def get_key(self) -> Optional[str]:
         """获取按键"""
         with self.lock:
             if self.key_queue:
                 return self.key_queue.pop(0)
         return None
-    
+
     def wait_for_key(self, timeout: float = 0.1) -> Optional[str]:
         """等待按键（带超时）"""
         start = time.time()
@@ -248,7 +248,7 @@ class GameInfo:
 
 class GameController(ABC):
     """游戏控制器基类"""
-    
+
     def __init__(self, console: Console):
         self.console = console
         self.running = False
@@ -256,17 +256,17 @@ class GameController(ABC):
         self.score = 0
         self.high_score = 0
         self.paused = False
-    
+
     @abstractmethod
     def run(self) -> bool:
         """运行游戏，返回是否继续"""
         pass
-    
+
     @abstractmethod
     def handle_input(self, key: str) -> None:
         """处理输入"""
         pass
-    
+
     def stop(self):
         """停止游戏"""
         self.running = False
@@ -278,7 +278,7 @@ class GameController(ABC):
 
 class SnakeGame(GameController):
     """贪吃蛇游戏"""
-    
+
     def __init__(self, console: Console):
         super().__init__(console)
         self.snake: List[tuple] = []
@@ -289,7 +289,7 @@ class SnakeGame(GameController):
         self.game_height = 15
         self.game_left = 2
         self.game_top = 4
-    
+
     def init_game(self):
         """初始化游戏"""
         cols, rows = get_terminal_size()
@@ -297,7 +297,7 @@ class SnakeGame(GameController):
         self.game_height = min(rows - 10, 18)
         self.game_left = max(2, (cols - self.game_width - 2) // 2)
         self.game_top = max(3, (rows - self.game_height - 6) // 2)
-        
+
         # 初始化蛇
         start_x = self.game_width // 2
         start_y = self.game_height // 2
@@ -311,7 +311,7 @@ class SnakeGame(GameController):
         self.score = 0
         self.game_over = False
         self.spawn_food()
-    
+
     def spawn_food(self):
         """生成食物"""
         while True:
@@ -320,15 +320,15 @@ class SnakeGame(GameController):
             if (x, y) not in self.snake:
                 self.food = (x, y)
                 break
-    
+
     def update(self):
         """更新游戏状态"""
         if self.game_over or self.paused:
             return
-        
+
         self.direction = self.next_direction
         head_x, head_y = self.snake[0]
-        
+
         if self.direction == 'UP':
             head_y -= 1
         elif self.direction == 'DOWN':
@@ -337,7 +337,7 @@ class SnakeGame(GameController):
             head_x -= 1
         elif self.direction == 'RIGHT':
             head_x += 1
-        
+
         # 检查碰撞
         if (head_x <= 0 or head_x >= self.game_width or
             head_y <= 0 or head_y >= self.game_height or
@@ -346,23 +346,23 @@ class SnakeGame(GameController):
             if self.score > self.high_score:
                 self.high_score = self.score
             return
-        
+
         self.snake.insert(0, (head_x, head_y))
-        
+
         # 检查是否吃到食物
         if (head_x, head_y) == self.food:
             self.score += 10
             self.spawn_food()
         else:
             self.snake.pop()
-    
+
     def render(self):
         """渲染游戏"""
         output = []
         output.append('\033[2J\033[H')  # 清屏
-        
+
         theme_color = get_theme_color()
-        
+
         # 标题
         title = [
             "█ █ █▄█ █▀█ █▀▀ █▀█   █▀▀ █▄ █ ▄▀█ █▄▀ █▀▀",
@@ -371,11 +371,11 @@ class SnakeGame(GameController):
         title_x = max(1, self.game_left + (self.game_width - len(title[0])) // 2)
         output.append(f'\033[{max(1, self.game_top - 3)};{title_x}H\033[1m{theme_color}{title[0]}\033[0m')
         output.append(f'\033[{max(1, self.game_top - 2)};{title_x}H\033[1m{theme_color}{title[1]}\033[0m')
-        
+
         # 分数
         score_text = f"分数：{self.score:04d}  最高分：{self.high_score:04d}"
         output.append(f'\033[{max(2, self.game_top - 1)};{self.game_left}H{theme_color}{score_text}\033[0m')
-        
+
         # 边框
         border = '═' * self.game_width
         output.append(f'\033[{self.game_top};{self.game_left}H{theme_color}╔{border}╗\033[0m')
@@ -383,7 +383,7 @@ class SnakeGame(GameController):
             output.append(f'\033[{self.game_top + y};{self.game_left}H{theme_color}║\033[0m')
             output.append(f'\033[{self.game_top + y};{self.game_left + self.game_width + 1}H{theme_color}║\033[0m')
         output.append(f'\033[{self.game_top + self.game_height + 1};{self.game_left}H{theme_color}╚{border}╝\033[0m')
-        
+
         if not self.game_over:
             if self.paused:
                 pause_msg = "══ 暂停 ══"
@@ -397,7 +397,7 @@ class SnakeGame(GameController):
                 food_x = self.game_left + self.food[0] + 1
                 food_y = self.game_top + self.food[1]
                 output.append(f'\033[{food_y};{food_x}H\033[1;33m{food_char}\033[0m')
-                
+
                 # 绘制蛇
                 for i, (sx, sy) in enumerate(self.snake):
                     char = '█' if i == 0 else '▓'
@@ -405,7 +405,7 @@ class SnakeGame(GameController):
                     draw_x = self.game_left + sx + 1
                     draw_y = self.game_top + sy
                     output.append(f'\033[{draw_y};{draw_x}H{brightness}{theme_color}{char}\033[0m')
-                
+
                 hint = '[ESC] 菜单'
                 output.append(f'\033[{self.game_top + self.game_height + 3};{self.game_left}H\033[2m{hint}\033[0m')
         else:
@@ -415,9 +415,9 @@ class SnakeGame(GameController):
             output.append(f'\033[{over_y};{over_x}H\033[1;31m{over_msg}\033[0m')
             output.append(f'\033[{over_y + 2};{over_x}H{theme_color}最终分数：{self.score}\033[0m')
             output.append(f'\033[{over_y + 4};{over_x}H\033[2m[R] 重新开始  [Q] 退出\033[0m')
-        
+
         self.console.print(''.join(output), end='')
-    
+
     def handle_input(self, key: str) -> None:
         """处理输入"""
         if self.game_over:
@@ -426,12 +426,12 @@ class SnakeGame(GameController):
             elif key == 'Q':
                 self.running = False
             return
-        
+
         if self.paused:
             if key == 'ENTER':
                 self.paused = False
             return
-        
+
         if key == 'UP' or key == 'W':
             if self.direction != 'DOWN':
                 self.next_direction = 'UP'
@@ -448,43 +448,43 @@ class SnakeGame(GameController):
             self.paused = True
         elif key == 'Q':
             self.running = False
-    
+
     def run(self) -> bool:
         """运行游戏"""
         self.init_game()
         self.running = True
         last_update = time.time()
         update_interval = 0.12  # 蛇的移动速度
-        
+
         handler = KeyHandler()
         handler.start()
-        
+
         try:
             enter_alternate_buffer()
             hide_cursor()
-            
+
             while self.running:
                 # 处理输入
                 key = handler.wait_for_key(0.05)
                 if key:
                     self.handle_input(key)
-                
+
                 # 更新游戏状态
                 now = time.time()
                 if now - last_update >= update_interval:
                     if not self.paused and not self.game_over:
                         self.update()
                     last_update = now
-                
+
                 # 渲染
                 self.render()
-                
+
                 # 控制帧率
                 time.sleep(0.025)
         finally:
             handler.stop()
             exit_alternate_buffer()
-        
+
         return False  # 不返回菜单
 
 
@@ -494,13 +494,13 @@ class SnakeGame(GameController):
 
 class Game2048(GameController):
     """2048 游戏"""
-    
+
     def __init__(self, console: Console):
         super().__init__(console)
         self.grid: List[List[int]] = []
         self.grid_size = 4
         self.cell_width = 6
-    
+
     def init_game(self):
         """初始化游戏"""
         self.grid = [[0] * self.grid_size for _ in range(self.grid_size)]
@@ -508,7 +508,7 @@ class Game2048(GameController):
         self.game_over = False
         self.add_random_tile()
         self.add_random_tile()
-    
+
     def add_random_tile(self):
         """添加随机方块"""
         empty_cells = []
@@ -516,16 +516,16 @@ class Game2048(GameController):
             for c in range(self.grid_size):
                 if self.grid[r][c] == 0:
                     empty_cells.append((r, c))
-        
+
         if empty_cells:
             r, c = random.choice(empty_cells)
             self.grid[r][c] = 2 if random.random() < 0.9 else 4
-    
+
     def slide_line(self, line: List[int]) -> List[int]:
         """滑动一行"""
         # 移除零
         new_line = [x for x in line if x != 0]
-        
+
         # 合并相同数字
         i = 0
         while i < len(new_line) - 1:
@@ -534,18 +534,18 @@ class Game2048(GameController):
                 self.score += new_line[i]
                 new_line.pop(i + 1)
             i += 1
-        
+
         # 补零
         while len(new_line) < self.grid_size:
             new_line.append(0)
-        
+
         return new_line
-    
+
     def move(self, direction: str) -> bool:
         """移动方块"""
         moved = False
         old_grid = [row[:] for row in self.grid]
-        
+
         if direction == 'LEFT':
             for r in range(self.grid_size):
                 self.grid[r] = self.slide_line(self.grid[r])
@@ -564,16 +564,16 @@ class Game2048(GameController):
                 new_col = self.slide_line(col)[::-1]
                 for r in range(self.grid_size):
                     self.grid[r][c] = new_col[r]
-        
+
         moved = self.grid != old_grid
-        
+
         if moved:
             self.add_random_tile()
             if self.check_game_over():
                 self.game_over = True
-        
+
         return moved
-    
+
     def check_game_over(self) -> bool:
         """检查游戏是否结束"""
         # 检查是否有空格
@@ -581,7 +581,7 @@ class Game2048(GameController):
             for c in range(self.grid_size):
                 if self.grid[r][c] == 0:
                     return False
-        
+
         # 检查是否有可合并的相邻方块
         for r in range(self.grid_size):
             for c in range(self.grid_size):
@@ -590,32 +590,32 @@ class Game2048(GameController):
                     return False
                 if r < self.grid_size - 1 and val == self.grid[r + 1][c]:
                     return False
-        
+
         return True
-    
+
     def render(self):
         """渲染游戏"""
         output = []
         output.append('\033[2J\033[H')
-        
+
         theme_color = get_theme_color()
         cols, rows = get_terminal_size()
-        
+
         # 计算位置
         game_width = self.grid_size * (self.cell_width + 1) + 1
         game_height = self.grid_size * 3 + 1
         game_left = max(2, (cols - game_width) // 2)
         game_top = max(4, (rows - game_height - 6) // 2)
-        
+
         # 标题
         title = "═══ 2048 ═══"
         title_x = max(1, game_left + (game_width - len(title)) // 2)
         output.append(f'\033[{game_top - 3};{title_x}H\033[1m{theme_color}{title}\033[0m')
-        
+
         # 分数
         score_text = f"分数：{self.score}"
         output.append(f'\033[{game_top - 1};{game_left}H{theme_color}{score_text}\033[0m')
-        
+
         # 绘制网格
         color_map = {
             0: '\033[2m',
@@ -631,7 +631,7 @@ class Game2048(GameController):
             1024: '\033[1;35m',
             2048: '\033[1;37m',
         }
-        
+
         for r in range(self.grid_size):
             # 上边框
             h_line = '─' * self.cell_width
@@ -639,7 +639,7 @@ class Game2048(GameController):
             for c in range(1, self.grid_size):
                 output.append(f'\033[{game_top + r * 3};{game_left + c * (self.cell_width + 1)}H{theme_color}┬\033[0m')
             output.append(f'\033[{game_top + r * 3};{game_left + game_width - 1}H┐\033[0m')
-            
+
             # 数字行
             num_row = f'\033[{game_top + r * 3 + 1};{game_left}H{theme_color}│\033[0m'
             output.append(num_row)
@@ -652,13 +652,13 @@ class Game2048(GameController):
                 if c < self.grid_size - 1:
                     output.append(f'\033[{game_top + r * 3 + 1};{game_left + (c + 1) * (self.cell_width + 1) - 1}H{theme_color}│\033[0m')
             output.append(f'\033[{game_top + r * 3 + 1};{game_left + game_width}H{theme_color}│\033[0m')
-            
+
             # 下边框
             output.append(f'\033[{game_top + r * 3 + 2};{game_left}H{theme_color}└{h_line}┘\033[0m')
             for c in range(1, self.grid_size):
                 output.append(f'\033[{game_top + r * 3 + 2};{game_left + c * (self.cell_width + 1)}H{theme_color}┴\033[0m')
             output.append(f'\033[{game_top + r * 3 + 2};{game_left + game_width - 1}H┘\033[0m')
-        
+
         # 底部边框
         bottom_y = game_top + self.grid_size * 3
         h_line = '─' * self.cell_width
@@ -666,7 +666,7 @@ class Game2048(GameController):
         for c in range(1, self.grid_size):
             output.append(f'\033[{bottom_y};{game_left + c * (self.cell_width + 1)}H{theme_color}└\033[0m')
         output.append(f'\033[{bottom_y};{game_left + game_width - 1}H┘\033[0m')
-        
+
         if self.game_over:
             over_msg = "游戏结束!"
             over_x = game_left + (game_width - len(over_msg)) // 2
@@ -677,9 +677,9 @@ class Game2048(GameController):
             hint = "↑↓←→ 移动  [Q] 退出"
             hint_x = game_left + (game_width - len(hint)) // 2
             output.append(f'\033[{bottom_y + 2};{hint_x}H\033[2m{hint}\033[0m')
-        
+
         self.console.print(''.join(output), end='')
-    
+
     def handle_input(self, key: str) -> None:
         """处理输入"""
         if self.game_over:
@@ -688,7 +688,7 @@ class Game2048(GameController):
             elif key == 'Q':
                 self.running = False
             return
-        
+
         if key in ['UP', 'W']:
             self.move('UP')
         elif key in ['DOWN', 'S']:
@@ -699,19 +699,19 @@ class Game2048(GameController):
             self.move('RIGHT')
         elif key == 'Q':
             self.running = False
-    
+
     def run(self) -> bool:
         """运行游戏"""
         self.init_game()
         self.running = True
-        
+
         handler = KeyHandler()
         handler.start()
-        
+
         try:
             enter_alternate_buffer()
             hide_cursor()
-            
+
             while self.running:
                 key = handler.wait_for_key(0.05)
                 if key:
@@ -721,7 +721,7 @@ class Game2048(GameController):
         finally:
             handler.stop()
             exit_alternate_buffer()
-        
+
         return False
 
 
@@ -731,7 +731,7 @@ class Game2048(GameController):
 
 class PongGame(GameController):
     """乒乓球游戏（单人版）"""
-    
+
     def __init__(self, console: Console):
         super().__init__(console)
         self.paddle_y = 0
@@ -743,38 +743,38 @@ class PongGame(GameController):
         self.game_height = 15
         self.paddle_height = 4
         self.ai_speed = 0.3
-    
+
     def init_game(self):
         """初始化游戏"""
         cols, rows = get_terminal_size()
         self.game_width = min(cols - 4, 50)
         self.game_height = min(rows - 10, 18)
-        
+
         self.paddle_y = self.game_height // 2 - self.paddle_height // 2
         self.reset_ball()
         self.score = 0
         self.game_over = False
-    
+
     def reset_ball(self):
         """重置球的位置"""
         self.ball_x = self.game_width // 2
         self.ball_y = self.game_height // 2
         self.ball_dx = random.choice([-1, 1])
         self.ball_dy = random.choice([-1, 1])
-    
+
     def update(self):
         """更新游戏状态"""
         if self.game_over:
             return
-        
+
         # 移动球
         self.ball_x += self.ball_dx
         self.ball_y += self.ball_dy
-        
+
         # 上下墙壁反弹
         if self.ball_y <= 0 or self.ball_y >= self.game_height - 1:
             self.ball_dy = -self.ball_dy
-        
+
         # AI 控制右侧挡板
         paddle_center = self.paddle_y + self.paddle_height // 2
         if paddle_center < self.ball_y - 1:
@@ -782,40 +782,40 @@ class PongGame(GameController):
         elif paddle_center > self.ball_y + 1:
             self.paddle_y -= self.ai_speed
         self.paddle_y = max(0, min(self.game_height - self.paddle_height, self.paddle_y))
-        
+
         # 左侧挡板（玩家）检测
         if self.ball_x <= 1:
-            if (self.ball_y >= self.paddle_y and 
+            if (self.ball_y >= self.paddle_y and
                 self.ball_y < self.paddle_y + self.paddle_height):
                 self.ball_dx = -self.ball_dx
                 self.ball_dx = min(abs(self.ball_dx) + 0.2, 2)  # 加速
                 self.score += 1
             else:
                 self.game_over = True
-        
+
         # 右侧墙壁
         if self.ball_x >= self.game_width - 1:
             self.ball_dx = -self.ball_dx
-    
+
     def render(self):
         """渲染游戏"""
         output = []
         output.append('\033[2J\033[H')
-        
+
         theme_color = get_theme_color()
         cols, rows = get_terminal_size()
-        
+
         game_left = max(2, (cols - self.game_width - 2) // 2)
         game_top = max(4, (rows - self.game_height - 6) // 2)
-        
+
         # 标题
         title = "═══ 乒乓球 ═══"
         title_x = max(1, game_left + (self.game_width - len(title)) // 2)
         output.append(f'\033[{game_top - 3};{title_x}H\033[1m{theme_color}{title}\033[0m')
-        
+
         # 分数
         output.append(f'\033[{game_top - 1};{game_left}H{theme_color}分数：{self.score}\033[0m')
-        
+
         # 边框
         border = '─' * self.game_width
         output.append(f'\033[{game_top};{game_left}H{theme_color}╔{border}╗\033[0m')
@@ -823,32 +823,32 @@ class PongGame(GameController):
             output.append(f'\033[{game_top + y};{game_left}H{theme_color}║\033[0m')
             output.append(f'\033[{game_top + y};{game_left + self.game_width + 1}H{theme_color}║\033[0m')
         output.append(f'\033[{game_top + self.game_height + 1};{game_left}H{theme_color}╚{border}╝\033[0m')
-        
+
         if not self.game_over:
             # 绘制左侧挡板（玩家）
             for i in range(self.paddle_height):
                 py = int(self.paddle_y) + i
                 if 0 <= py < self.game_height:
                     output.append(f'\033[{game_top + py + 1};{game_left + 1}H{theme_color}█\033[0m')
-            
+
             # 绘制右侧挡板（AI）
             ai_x = self.game_width - 2
             for i in range(self.paddle_height):
                 py = int(self.paddle_y) + i
                 if 0 <= py < self.game_height:
                     output.append(f'\033[{game_top + py + 1};{game_left + ai_x}H{theme_color}█\033[0m')
-            
+
             # 绘制球
             ball_char = '●'
             bx = game_left + int(self.ball_x) + 1
             by = game_top + int(self.ball_y) + 1
             output.append(f'\033[{by};{bx}H\033[1;33m{ball_char}\033[0m')
-            
+
             # 中线
             for y in range(1, self.game_height, 2):
                 mid_x = game_left + self.game_width // 2
                 output.append(f'\033[{game_top + y};{mid_x}H\033[2m·\033[0m')
-            
+
             hint = "↑↓ 移动挡板  [Q] 退出"
             output.append(f'\033[{game_top + self.game_height + 3};{game_left}H\033[2m{hint}\033[0m')
         else:
@@ -858,9 +858,9 @@ class PongGame(GameController):
             output.append(f'\033[{over_y};{over_x}H\033[1;31m{over_msg}\033[0m')
             output.append(f'\033[{over_y + 2};{over_x}H{theme_color}最终分数：{self.score}\033[0m')
             output.append(f'\033[{over_y + 4};{over_x}H\033[2m[R] 重来  [Q] 退出\033[0m')
-        
+
         self.console.print(''.join(output), end='')
-    
+
     def handle_input(self, key: str) -> None:
         """处理输入"""
         if self.game_over:
@@ -869,44 +869,44 @@ class PongGame(GameController):
             elif key == 'Q':
                 self.running = False
             return
-        
+
         if key in ['UP', 'W']:
             self.paddle_y = max(0, self.paddle_y - 1)
         elif key in ['DOWN', 'S']:
             self.paddle_y = min(self.game_height - self.paddle_height, self.paddle_y + 1)
         elif key == 'Q':
             self.running = False
-    
+
     def run(self) -> bool:
         """运行游戏"""
         self.init_game()
         self.running = True
         last_update = time.time()
         update_interval = 0.08
-        
+
         handler = KeyHandler()
         handler.start()
-        
+
         try:
             enter_alternate_buffer()
             hide_cursor()
-            
+
             while self.running:
                 key = handler.wait_for_key(0.03)
                 if key:
                     self.handle_input(key)
-                
+
                 now = time.time()
                 if now - last_update >= update_interval:
                     self.update()
                     last_update = now
-                
+
                 self.render()
                 time.sleep(0.03)
         finally:
             handler.stop()
             exit_alternate_buffer()
-        
+
         return False
 
 
@@ -916,21 +916,21 @@ class PongGame(GameController):
 
 class HangmanGame(GameController):
     """猜词游戏"""
-    
+
     WORDS = [
         "PYTHON", "PROGRAM", "COMPUTER", "TERMINAL", "GAME",
         "SNAKE", "TETRIS", "PUZZLE", "CODE", "DEVELOPER",
         "ALGORITHM", "VARIABLE", "FUNCTION", "LOOP", "STRING",
         "ARRAY", "OBJECT", "CLASS", "METHOD", "DEBUG",
     ]
-    
+
     def __init__(self, console: Console):
         super().__init__(console)
         self.word = ""
         self.guessed: set = set()
         self.wrong_guesses = 0
         self.max_wrong = 6
-    
+
     def init_game(self):
         """初始化游戏"""
         self.word = random.choice(self.WORDS)
@@ -938,61 +938,68 @@ class HangmanGame(GameController):
         self.wrong_guesses = 0
         self.game_over = False
         self.score = 0
-    
+
     def is_won(self) -> bool:
         """检查是否获胜"""
         return all(c in self.guessed for c in self.word)
-    
+
     def is_lost(self) -> bool:
         """检查是否失败"""
         return self.wrong_guesses >= self.max_wrong
-    
+
     def render(self):
         """渲染游戏"""
         output = []
         output.append('\033[2J\033[H')
-        
+
         theme_color = get_theme_color()
         cols, rows = get_terminal_size()
-        
+
         game_width = 50
         game_left = max(2, (cols - game_width) // 2)
         game_top = max(4, (rows - 20) // 2)
-        
+
         # 标题
         title = "═══ 猜词游戏 ═══"
         title_x = max(1, game_left + (game_width - len(title)) // 2)
         output.append(f'\033[{game_top - 2};{title_x}H\033[1m{theme_color}{title}\033[0m')
-        
+
         # 绘制小人
+        head = 'O' if self.wrong_guesses >= 1 else ' '
+        left_arm = '/' if self.wrong_guesses >= 2 else ' '
+        body = '|' if self.wrong_guesses >= 2 else ' '
+        right_arm = '\\' if self.wrong_guesses >= 3 else ' '
+        left_leg = '/' if self.wrong_guesses >= 4 else ' '
+        right_leg = '\\' if self.wrong_guesses >= 5 else ' '
+
         hangman_art = [
             "  ┌─────┐ ",
-            f"  │ {'O' if self.wrong_guesses >= 1 else ' '}     │ ",
-            f"  │ {'/' if self.wrong_guesses >= 2 else ' '}{'|' if self.wrong_guesses >= 2 else ' '}{'\\' if self.wrong_guesses >= 3 else ' '}    │ ",
-            f"  │ {'/' if self.wrong_guesses >= 4 else ' '} {' ' if self.wrong_guesses < 5 else '\\'}   │ ",
+            f"  │ {head}     │ ",
+            f"  │ {left_arm}{body}{right_arm}    │ ",
+            f"  │ {left_leg} {right_leg}   │ ",
             "  │       │ ",
             " ─┴───────┴─ ",
         ]
-        
+
         art_left = game_left + 2
         for i, line in enumerate(hangman_art):
             output.append(f'\033[{game_top + i};{art_left}H{theme_color}{line}\033[0m')
-        
+
         # 显示单词
         display_word = ' '.join(c if c in self.guessed else '_' for c in self.word)
         word_y = game_top + 8
         word_x = game_left + 20
         output.append(f'\033[{word_y};{word_x}H\033[1m{display_word}\033[0m')
-        
+
         # 错误次数
         wrong_y = game_top + 10
         output.append(f'\033[{wrong_y};{word_x}H\033[2m错误：{self.wrong_guesses}/{self.max_wrong}\033[0m')
-        
+
         # 已猜字母
         guessed_str = ' '.join(sorted(self.guessed)) if self.guessed else '无'
         guessed_y = game_top + 12
         output.append(f'\033[{guessed_y};{word_x}H\033[2m已猜：{guessed_str}\033[0m')
-        
+
         if self.is_won():
             win_msg = "🎉 你赢了！🎉"
             msg_x = word_x + (len(display_word) - len(win_msg)) // 2
@@ -1005,9 +1012,9 @@ class HangmanGame(GameController):
         else:
             hint = "输入 A-Z 猜字母  [Q] 退出"
             output.append(f'\033[{word_y + 5};{word_x}H\033[2m{hint}\033[0m')
-        
+
         self.console.print(''.join(output), end='')
-    
+
     def handle_input(self, key: str) -> None:
         """处理输入"""
         if self.is_won() or self.is_lost():
@@ -1016,11 +1023,11 @@ class HangmanGame(GameController):
             elif key == 'Q':
                 self.running = False
             return
-        
+
         if key == 'Q':
             self.running = False
             return
-        
+
         # 处理字母输入
         if len(key) == 1 and key.isalpha():
             letter = key.upper()
@@ -1028,22 +1035,22 @@ class HangmanGame(GameController):
                 self.guessed.add(letter)
                 if letter not in self.word:
                     self.wrong_guesses += 1
-                
+
                 if self.is_won() or self.is_lost():
                     self.game_over = True
-    
+
     def run(self) -> bool:
         """运行游戏"""
         self.init_game()
         self.running = True
-        
+
         handler = KeyHandler()
         handler.start()
-        
+
         try:
             enter_alternate_buffer()
             hide_cursor()
-            
+
             while self.running:
                 key = handler.wait_for_key(0.05)
                 if key:
@@ -1053,7 +1060,7 @@ class HangmanGame(GameController):
         finally:
             handler.stop()
             exit_alternate_buffer()
-        
+
         return False
 
 
@@ -1063,20 +1070,20 @@ class HangmanGame(GameController):
 
 class TicTacToeGame(GameController):
     """井字棋游戏（双人对战）"""
-    
+
     def __init__(self, console: Console):
         super().__init__(console)
         self.board: List[str] = []
         self.current_player = 'X'
         self.ai_enabled = True
-    
+
     def init_game(self):
         """初始化游戏"""
         self.board = [' '] * 9
         self.current_player = 'X'
         self.game_over = False
         self.score = 0
-    
+
     def check_winner(self) -> Optional[str]:
         """检查获胜者"""
         lines = [
@@ -1084,28 +1091,28 @@ class TicTacToeGame(GameController):
             [0, 3, 6], [1, 4, 7], [2, 5, 8],  # 竖
             [0, 4, 8], [2, 4, 6],              # 斜
         ]
-        
+
         for line in lines:
             a, b, c = line
             if self.board[a] == self.board[b] == self.board[c] != ' ':
                 return self.board[a]
-        
+
         if ' ' not in self.board:
             return 'T'  # 平局
-        
+
         return None
-    
+
     def minimax(self, board: List[str], depth: int, is_maximizing: bool) -> int:
         """Minimax 算法"""
         winner = self.check_winner_on_board(board)
-        
+
         if winner == 'O':
             return 10 - depth
         elif winner == 'X':
             return depth - 10
         elif winner == 'T':
             return 0
-        
+
         if is_maximizing:
             best_score = -float('inf')
             for i in range(9):
@@ -1124,7 +1131,7 @@ class TicTacToeGame(GameController):
                     board[i] = ' '
                     best_score = min(score, best_score)
             return best_score
-    
+
     def check_winner_on_board(self, board: List[str]) -> Optional[str]:
         """检查棋盘上的获胜者"""
         lines = [
@@ -1132,22 +1139,22 @@ class TicTacToeGame(GameController):
             [0, 3, 6], [1, 4, 7], [2, 5, 8],
             [0, 4, 8], [2, 4, 6],
         ]
-        
+
         for line in lines:
             a, b, c = line
             if board[a] == board[b] == board[c] != ' ':
                 return board[a]
-        
+
         if ' ' not in board:
             return 'T'
-        
+
         return None
-    
+
     def ai_move(self):
         """AI 移动"""
         best_score = -float('inf')
         best_move = 4  # 优先中心
-        
+
         for i in range(9):
             if self.board[i] == ' ':
                 self.board[i] = 'O'
@@ -1156,50 +1163,50 @@ class TicTacToeGame(GameController):
                 if score > best_score:
                     best_score = score
                     best_move = i
-        
+
         self.board[best_move] = 'O'
-    
+
     def render(self):
         """渲染游戏"""
         output = []
         output.append('\033[2J\033[H')
-        
+
         theme_color = get_theme_color()
         cols, rows = get_terminal_size()
-        
+
         game_width = 20
         game_left = max(2, (cols - game_width) // 2)
         game_top = max(4, (rows - 15) // 2)
-        
+
         # 标题
         title = "═══ 井字棋 ═══"
         title_x = max(1, game_left + (game_width - len(title)) // 2)
         output.append(f'\033[{game_top - 2};{title_x}H\033[1m{theme_color}{title}\033[0m')
-        
+
         # 绘制棋盘
         for r in range(3):
             y = game_top + r * 3
             output.append(f'\033[{y};{game_left}H{theme_color}   │   │   \033[0m')
             output.append(f'\033[{y + 1};{game_left}H{theme_color}─┼───┼───\033[0m')
-        
+
         # 清除最后一行横线
         output.append(f'\033[{game_top + 9};{game_left}H           \033[0m')
-        
+
         # 填充棋子
         for i, cell in enumerate(self.board):
             r, c = i // 3, i % 3
             y = game_top + r * 3
             x = game_left + c * 4 + 1
-            
+
             if cell == 'X':
                 output.append(f'\033[{y};{x}H\033[1;36mX\033[0m')
             elif cell == 'O':
                 output.append(f'\033[{y};{x}H\033[1;33mO\033[0m')
-        
+
         # 当前玩家
         player_text = f"当前：{self.current_player}"
         output.append(f'\033[{game_top + 11};{game_left}H{theme_color}{player_text}\033[0m')
-        
+
         winner = self.check_winner()
         if winner:
             if winner == 'T':
@@ -1210,51 +1217,51 @@ class TicTacToeGame(GameController):
             output.append(f'\033[{game_top + 15};{game_left}H\033[2m[R] 重来  [Q] 退出\033[0m')
         else:
             output.append(f'\033[{game_top + 15};{game_left}H\033[2m1-9 选择位置  [Q] 退出\033[0m')
-        
+
         self.console.print(''.join(output), end='')
-    
+
     def handle_input(self, key: str) -> None:
         """处理输入"""
         winner = self.check_winner()
-        
+
         if winner:
             if key == 'R':
                 self.init_game()
             elif key == 'Q':
                 self.running = False
             return
-        
+
         if key == 'Q':
             self.running = False
             return
-        
+
         # 数字键选择位置
         if key in '123456789':
             pos = int(key) - 1
             if 0 <= pos < 9 and self.board[pos] == ' ':
                 self.board[pos] = self.current_player
-                
+
                 if not self.check_winner():
                     self.current_player = 'O' if self.current_player == 'X' else 'X'
-                    
+
                     # AI 回合
                     if self.ai_enabled and self.current_player == 'O':
                         self.ai_move()
                         if not self.check_winner():
                             self.current_player = 'X'
-    
+
     def run(self) -> bool:
         """运行游戏"""
         self.init_game()
         self.running = True
-        
+
         handler = KeyHandler()
         handler.start()
-        
+
         try:
             enter_alternate_buffer()
             hide_cursor()
-            
+
             while self.running:
                 key = handler.wait_for_key(0.05)
                 if key:
@@ -1264,7 +1271,7 @@ class TicTacToeGame(GameController):
         finally:
             handler.stop()
             exit_alternate_buffer()
-        
+
         return False
 
 
@@ -1290,7 +1297,7 @@ def create_game(game_id: str, console: Console) -> Optional[GameController]:
         "hangman": HangmanGame,
         "tictactoe": TicTacToeGame,
     }
-    
+
     game_class = games_map.get(game_id)
     if game_class:
         return game_class(console)
@@ -1301,19 +1308,19 @@ def show_menu(console: Console) -> Optional[str]:
     """显示游戏菜单"""
     selected = 0
     running = True
-    
+
     handler = KeyHandler()
     handler.start()
-    
+
     try:
         while running:
             output = []
             output.append('\033[2J\033[H')
-            
+
             theme_color = get_theme_color()
             theme_name = get_theme_name()
             cols, rows = get_terminal_size()
-            
+
             # 标题
             title = [
                 "█ █ █▄█ █▀█ █▀▀ █▀█   █▀▀ █▄ █ ▄▀█ █▄▀ █▀▀",
@@ -1322,41 +1329,41 @@ def show_menu(console: Console) -> Optional[str]:
             title_x = max(1, (cols - len(title[0])) // 2)
             output.append(f'\033[3;{title_x}H\033[1m{theme_color}{title[0]}\033[0m')
             output.append(f'\033[4;{title_x}H\033[1m{theme_color}{title[1]}\033[0m')
-            
+
             subtitle = f"终端游戏集合 - 主题：{theme_name}"
             output.append(f'\033[6;{(cols - len(subtitle)) // 2}H\033[2m{subtitle}\033[0m')
-            
+
             # 游戏列表
             menu_width = 45
             menu_left = max(2, (cols - menu_width) // 2)
             menu_top = 9
-            
+
             # 边框
             output.append(f'\033[{menu_top};{menu_left}H{theme_color}╔{"═" * menu_width}╗\033[0m')
             for i in range(len(GAMES)):
                 output.append(f'\033[{menu_top + 1 + i};{menu_left}H{theme_color}║\033[0m')
                 output.append(f'\033[{menu_top + 1 + i};{menu_left + menu_width + 1}H{theme_color}║\033[0m')
             output.append(f'\033[{menu_top + 1 + len(GAMES)};{menu_left}H{theme_color}╚{"═" * menu_width}╝\033[0m')
-            
+
             # 游戏选项
             for i, game in enumerate(GAMES):
                 y = menu_top + 1 + i
                 x = menu_left + 2
-                
+
                 if i == selected:
                     output.append(f'\033[{y};{x}H\033[1;30;106m ► {game.name} - {game.description} ◄ \033[0m')
                 else:
                     output.append(f'\033[{y};{x}H  {i + 1}. {game.name} - {game.description} ')
-            
+
             # 底部提示
             controls = "↑↓ 选择  ENTER 确认  Q 退出"
             output.append(f'\033[{rows - 2};{(cols - len(controls)) // 2}H\033[2m{controls}\033[0m')
-            
+
             theme_hint = f"--theme <主题> 切换主题 (cyan/green/amber/...)"
             output.append(f'\033[{rows - 1};{(cols - len(theme_hint)) // 2}H\033[2m{theme_hint}\033[0m')
-            
+
             console.print(''.join(output), end='')
-            
+
             # 处理输入
             key = handler.wait_for_key(0.05)
             if key == 'UP' or key == 'W':
@@ -1371,10 +1378,10 @@ def show_menu(console: Console) -> Optional[str]:
                     return GAMES[idx].id
             elif key == 'Q':
                 running = False
-    
+
     finally:
         handler.stop()
-    
+
     return None
 
 
@@ -1394,7 +1401,7 @@ def print_help():
 """
     for game in GAMES:
         help_text += f"    {game.id:<15} {game.description}\n"
-    
+
     help_text += """
 主题:
     cyan (默认), amber, green, white, hotpink, blood, ice,
@@ -1424,16 +1431,16 @@ def print_list():
 def main():
     """主函数"""
     args = sys.argv[1:]
-    
+
     # 解析参数
     if '--help' in args or '-h' in args:
         print_help()
         return
-    
+
     if '--list' in args or '-l' in args:
         print_list()
         return
-    
+
     # 主题设置
     theme_idx = -1
     for i, arg in enumerate(args):
@@ -1441,13 +1448,13 @@ def main():
             theme_idx = i
             set_theme(args[i + 1])
             break
-    
+
     # 移除主题参数
     if theme_idx >= 0:
         args = args[:theme_idx] + args[theme_idx + 2:]
-    
+
     console = Console()
-    
+
     # 直接启动游戏
     if args:
         game_id = args[0].lower()
@@ -1467,7 +1474,7 @@ def main():
                     game.run()
             else:
                 break
-        
+
         clear_screen()
         print("感谢游玩！再见！👋")
 
