@@ -1,1 +1,4 @@
-Nothing needs to be added to .gitignore since only a Python source file (`cli_games.py`) was added, which is not a build artifact, dependency, temporary file, or other ignorable content.
+```
+__pycache__/
+*.pyc
+```
